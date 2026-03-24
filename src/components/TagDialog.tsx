@@ -79,7 +79,15 @@ export function TagDialog({
   const customSelectedTags = selectedTags.filter((tag) => !preloadedLabels.has(tag))
 
   return (
-    <div className="dialog-backdrop" role="presentation">
+    <div
+      className="dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onCancel()
+        }
+      }}
+      role="presentation"
+    >
       <section
         aria-labelledby="tag-dialog-title"
         aria-modal="true"

@@ -48,6 +48,8 @@ export default function App({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const filtersContainerRef = useRef<HTMLDivElement | null>(null)
+  const settingsContainerRef = useRef<HTMLDivElement | null>(null)
 
   const deferredFilters = useDeferredValue(activeFilters)
 
@@ -86,6 +88,42 @@ export default function App({
       isMounted = false
     }
   }, [repository])
+
+  useEffect(() => {
+    if (!filtersOpen && !settingsOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target
+
+      if (!(target instanceof Node)) {
+        return
+      }
+
+      if (
+        filtersOpen &&
+        filtersContainerRef.current &&
+        !filtersContainerRef.current.contains(target)
+      ) {
+        setFiltersOpen(false)
+      }
+
+      if (
+        settingsOpen &&
+        settingsContainerRef.current &&
+        !settingsContainerRef.current.contains(target)
+      ) {
+        setSettingsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+    }
+  }, [filtersOpen, settingsOpen])
 
   const refreshItems = async () => {
     const storedItems = await repository.getAllItems()
@@ -231,7 +269,7 @@ export default function App({
       <main className="app-frame">
         <section className="top-bar">
           <div className="top-bar-layout">
-            <div className="top-bar-filters">
+            <div className="top-bar-filters" ref={filtersContainerRef}>
               <button
                 aria-expanded={filtersOpen}
                 aria-label="Toggle filters"
@@ -293,7 +331,7 @@ export default function App({
               ) : null}
             </div>
             <h1 className="top-bar-title">Office Scanner</h1>
-            <div className="top-bar-settings">
+            <div className="top-bar-settings" ref={settingsContainerRef}>
               <button
                 aria-expanded={settingsOpen}
                 aria-label="Toggle settings"
@@ -378,7 +416,12 @@ export default function App({
                       ))
                     )}
                   </div>
-                  {item.comment ? <p className="item-comment">{item.comment}</p> : null}
+                  {item.comment ? (
+                    <p className="item-comment">
+                      <span className="item-comment-label">Note</span>
+                      {item.comment}
+                    </p>
+                  ) : null}
                   <p className="item-meta">
                     First scanned {formatDateTime(item.firstScannedAt)}
                   </p>

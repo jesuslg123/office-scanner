@@ -98,6 +98,14 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.body)
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: 'Import CSV' }),
+      ).not.toBeInTheDocument()
+    })
   })
 
   it('shows filters in a floating panel from the top bar', async () => {
@@ -141,6 +149,14 @@ describe('App', () => {
       await screen.findByRole('dialog', { name: 'Assign tags' }),
     ).toBeInTheDocument()
     expect(screen.getByText('12345')).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.querySelector('.dialog-backdrop') as Element)
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Assign tags' }),
+      ).not.toBeInTheDocument()
+    })
   })
 
   it('saves selected tags and updates the list', async () => {

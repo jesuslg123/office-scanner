@@ -356,11 +356,22 @@ button {
 }
 
 .item-comment {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(31, 122, 91, 0.08);
-  border: 1px solid rgba(31, 122, 91, 0.12);
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid rgba(32, 22, 12, 0.12);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.item-comment-label {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.68;
 }
 
 .compact {
