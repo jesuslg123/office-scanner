@@ -57,7 +57,7 @@ vi.mock('@zxing/library', () => ({
   ReaderException: zxingMocks.ReaderException,
 }))
 
-import { createBarcodeScanner } from './scanner'
+import { createBarcodeScanner, listAvailableCameras } from './scanner'
 
 function createVideoElement() {
   const video = document.createElement('video')
@@ -144,5 +144,67 @@ describe('createBarcodeScanner', () => {
     await scanner.start(video, vi.fn(), statusChange)
 
     expect(statusChange).toHaveBeenCalledWith('Camera pipeline failed.')
+  })
+
+  it('lists every available video input and keeps the preferred rear camera', async () => {
+    vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValue([
+      {
+        deviceId: 'front-camera',
+        groupId: 'front',
+        kind: 'videoinput',
+        label: 'Front Camera',
+        toJSON() {
+          return this
+        },
+      },
+      {
+        deviceId: 'tele-camera',
+        groupId: 'rear',
+        kind: 'videoinput',
+        label: 'Back Camera Telephoto',
+        toJSON() {
+          return this
+        },
+      },
+      {
+        deviceId: 'wide-camera',
+        groupId: 'rear',
+        kind: 'videoinput',
+        label: 'Back Camera Wide',
+        toJSON() {
+          return this
+        },
+      },
+    ])
+
+    const result = await listAvailableCameras()
+
+    expect(result.cameras).toEqual([
+      { id: 'front-camera', label: 'Front Camera' },
+      { id: 'tele-camera', label: 'Back Camera Telephoto' },
+      { id: 'wide-camera', label: 'Back Camera Wide' },
+    ])
+    expect(result.preferredCameraId).toBe('tele-camera')
+  })
+
+  it('uses the selected camera id when starting the scanner', async () => {
+    const statusChange = vi.fn()
+    const scanner = createBarcodeScanner({ deviceId: 'tele-camera' })
+    const video = createVideoElement()
+
+    zxingMocks.decodeFromConstraints.mockResolvedValue({ stop: vi.fn() })
+
+    await scanner.start(video, vi.fn(), statusChange)
+
+    expect(zxingMocks.decodeFromConstraints).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audio: false,
+        video: expect.objectContaining({
+          deviceId: { exact: 'tele-camera' },
+        }),
+      }),
+      video,
+      expect.any(Function),
+    )
   })
 })

@@ -1,5 +1,5 @@
 import { normalizeBarcode } from '../lib/items'
-import type { BarcodeScanner } from '../types'
+import type { BarcodeScanner, CameraOption, ScannerOptions } from '../types'
 
 type TrackCapabilitiesWithFocus = MediaTrackCapabilities & {
   focusMode?: string[]
@@ -18,6 +18,12 @@ const TRANSIENT_DECODE_ERROR_NAMES = new Set([
   'ReaderException',
 ])
 
+function getCameraLabel(device: MediaDeviceInfo, index: number): string {
+  const label = device.label.trim()
+
+  return label || `Camera ${index + 1}`
+}
+
 function isTransientDecodeError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false
@@ -31,10 +37,19 @@ function isTransientDecodeError(error: unknown): boolean {
   )
 }
 
-async function getPreferredRearCameraId(): Promise<string | undefined> {
-  const devices = await navigator.mediaDevices.enumerateDevices()
-  const videoInputs = devices.filter((device) => device.kind === 'videoinput')
+async function getAvailableVideoInputs(): Promise<MediaDeviceInfo[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    return []
+  }
 
+  const devices = await navigator.mediaDevices.enumerateDevices()
+
+  return devices.filter((device) => device.kind === 'videoinput')
+}
+
+function getPreferredRearCameraId(
+  videoInputs: MediaDeviceInfo[],
+): string | undefined {
   const preferredRearCamera = videoInputs.find((device) =>
     BACK_CAMERA_LABELS.test(device.label),
   )
@@ -50,6 +65,74 @@ async function getPreferredRearCameraId(): Promise<string | undefined> {
   return nonFrontCamera?.deviceId
 }
 
+export async function listAvailableCameras(): Promise<{
+  cameras: CameraOption[]
+  preferredCameraId?: string
+}> {
+  const videoInputs = await getAvailableVideoInputs()
+
+  return {
+    cameras: videoInputs.map((device, index) => ({
+      id: device.deviceId,
+      label: getCameraLabel(device, index),
+    })),
+    preferredCameraId: getPreferredRearCameraId(videoInputs),
+  }
+}
+
+function getPreferredConstraintValue(
+  capabilities: TrackCapabilitiesWithFocus,
+  preferredModes: string[],
+): FocusConstraintSet | null {
+  for (const focusMode of preferredModes) {
+    if (capabilities.focusMode?.includes(focusMode)) {
+      return { focusMode }
+    }
+  }
+
+  return null
+}
+
+async function applyPreferredFocus(
+  videoElement: HTMLVideoElement,
+  preferredModes: string[] = ['continuous', 'single-shot'],
+): Promise<boolean> {
+  const track = getActiveVideoTrack(videoElement)
+
+  if (!track || typeof track.getCapabilities !== 'function') {
+    return false
+  }
+
+  const capabilities = track.getCapabilities() as TrackCapabilitiesWithFocus
+  const preferredFocus = getPreferredConstraintValue(capabilities, preferredModes)
+
+  if (!preferredFocus) {
+    return false
+  }
+
+  try {
+    await track.applyConstraints({
+      advanced: [preferredFocus as MediaTrackConstraintSet],
+    })
+
+    return true
+  } catch {
+    // Focus-related constraints are uneven across devices, so ignore failures.
+    return false
+  }
+}
+
+async function getDefaultCameraId(): Promise<string | undefined> {
+  const videoInputs = await getAvailableVideoInputs()
+  const preferredRearCameraId = getPreferredRearCameraId(videoInputs)
+
+  if (preferredRearCameraId) {
+    return preferredRearCameraId
+  }
+
+  return videoInputs[0]?.deviceId
+}
+
 function getActiveVideoTrack(videoElement: HTMLVideoElement): MediaStreamTrack | null {
   const stream = videoElement.srcObject
 
@@ -60,36 +143,9 @@ function getActiveVideoTrack(videoElement: HTMLVideoElement): MediaStreamTrack |
   return stream.getVideoTracks()[0] ?? null
 }
 
-async function applyPreferredFocus(videoElement: HTMLVideoElement): Promise<void> {
-  const track = getActiveVideoTrack(videoElement)
-
-  if (!track || typeof track.getCapabilities !== 'function') {
-    return
-  }
-
-  const capabilities = track.getCapabilities() as TrackCapabilitiesWithFocus
-  const advanced: FocusConstraintSet[] = []
-
-  if (capabilities.focusMode?.includes('continuous')) {
-    advanced.push({ focusMode: 'continuous' })
-  } else if (capabilities.focusMode?.includes('single-shot')) {
-    advanced.push({ focusMode: 'single-shot' })
-  }
-
-  if (advanced.length === 0) {
-    return
-  }
-
-  try {
-    await track.applyConstraints({
-      advanced: advanced as MediaTrackConstraintSet[],
-    })
-  } catch {
-    // Focus-related constraints are uneven across devices, so ignore failures.
-  }
-}
-
-export function createBarcodeScanner(): BarcodeScanner {
+export function createBarcodeScanner(
+  options: ScannerOptions = {},
+): BarcodeScanner {
   let controls: { stop: () => void } | null = null
   let activeVideo: HTMLVideoElement | null = null
   let cleanVideoSource: ((video: HTMLVideoElement) => void) | null = null
@@ -150,14 +206,14 @@ export function createBarcodeScanner(): BarcodeScanner {
       })
 
       try {
-        const preferredRearCameraId = await getPreferredRearCameraId()
+        const cameraId = options.deviceId ?? (await getDefaultCameraId())
 
         controls = await reader.decodeFromConstraints(
           {
             audio: false,
             video: {
-              ...(preferredRearCameraId
-                ? { deviceId: { exact: preferredRearCameraId } }
+              ...(cameraId
+                ? { deviceId: { exact: cameraId } }
                 : { facingMode: { ideal: 'environment' } }),
               width: { ideal: 1280 },
               height: { ideal: 1280 },
@@ -205,6 +261,13 @@ export function createBarcodeScanner(): BarcodeScanner {
             : 'Unable to access the camera.',
         )
       }
+    },
+    async focus() {
+      if (!activeVideo) {
+        return false
+      }
+
+      return applyPreferredFocus(activeVideo, ['single-shot', 'continuous'])
     },
     stop,
   }

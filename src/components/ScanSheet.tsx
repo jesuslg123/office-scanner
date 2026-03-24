@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 
-import type { CreateBarcodeScanner } from '../types'
+import { listAvailableCameras } from '../services/scanner'
+import type { CameraOption, CreateBarcodeScanner } from '../types'
 
 type ScanSheetProps = {
   open: boolean
@@ -21,9 +22,59 @@ export function ScanSheet({
 }: ScanSheetProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const scannerRef = useRef<ReturnType<CreateBarcodeScanner> | null>(null)
+  const [availableCameras, setAvailableCameras] = useState<CameraOption[]>([])
+  const [preferredCameraId, setPreferredCameraId] = useState<string | null>(null)
+  const [selectedCameraId, setSelectedCameraId] = useState<string | 'auto'>('auto')
+  const [isRefocusing, setIsRefocusing] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   const handleDetected = useEffectEvent(onDetected)
+  const syncAvailableCameras = useEffectEvent(async () => {
+    try {
+      const { cameras, preferredCameraId: nextPreferredCameraId } =
+        await listAvailableCameras()
+
+      setAvailableCameras(cameras)
+      setPreferredCameraId(nextPreferredCameraId ?? cameras[0]?.id ?? null)
+      setSelectedCameraId((current) =>
+        current !== 'auto' && !cameras.some((camera) => camera.id === current)
+          ? 'auto'
+          : current,
+      )
+    } catch {
+      setAvailableCameras([])
+      setPreferredCameraId(null)
+      setSelectedCameraId('auto')
+    }
+  })
+
+  const handleRefocus = useEffectEvent(async () => {
+    if (!scannerRef.current) {
+      return
+    }
+
+    setIsRefocusing(true)
+    setStatusMessage(null)
+
+    try {
+      const focused = await scannerRef.current.focus()
+
+      if (!focused) {
+        setStatusMessage('Refocus is not supported on this camera.')
+      }
+    } finally {
+      setIsRefocusing(false)
+    }
+  })
+
+  useEffect(() => {
+    if (!open) {
+      setStatusMessage(null)
+      return
+    }
+
+    void syncAvailableCameras()
+  }, [open])
 
   useEffect(() => {
     if (!open) {
@@ -38,19 +89,41 @@ export function ScanSheet({
       return
     }
 
-    const scanner = createScanner()
+    const scanner =
+      selectedCameraId === 'auto'
+        ? createScanner()
+        : createScanner({ deviceId: selectedCameraId })
+
     scannerRef.current = scanner
-    void scanner.start(videoRef.current, handleDetected, setStatusMessage)
+    setStatusMessage(null)
+
+    let active = true
+
+    void (async () => {
+      await scanner.start(videoRef.current!, handleDetected, setStatusMessage)
+
+      if (!active) {
+        return
+      }
+
+      await syncAvailableCameras()
+    })()
 
     return () => {
+      active = false
       scanner.stop()
       scannerRef.current = null
     }
-  }, [createScanner, open, pausedBarcode])
+  }, [createScanner, open, pausedBarcode, selectedCameraId])
 
   if (!open) {
     return null
   }
+
+  const activeCameraId =
+    selectedCameraId === 'auto'
+      ? (preferredCameraId ?? availableCameras[0]?.id ?? '')
+      : selectedCameraId
 
   return (
     <div className="sheet-backdrop" role="presentation">
@@ -97,6 +170,33 @@ export function ScanSheet({
           </div>
         ) : (
           <>
+            <div className="scanner-toolbar">
+              {availableCameras.length > 1 ? (
+                <label className="field-group camera-field" htmlFor="scanner-camera">
+                  <span className="field-label">Camera</span>
+                  <select
+                    className="select-input"
+                    id="scanner-camera"
+                    onChange={(event) => setSelectedCameraId(event.target.value)}
+                    value={activeCameraId}
+                  >
+                    {availableCameras.map((camera) => (
+                      <option key={camera.id} value={camera.id}>
+                        {camera.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                className="secondary-button scanner-action"
+                disabled={isRefocusing}
+                onClick={() => void handleRefocus()}
+                type="button"
+              >
+                {isRefocusing ? 'Refocusing...' : 'Refocus'}
+              </button>
+            </div>
             <div className="scanner-stage">
               <div className="scanner-frame">
                 <video

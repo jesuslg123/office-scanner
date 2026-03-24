@@ -26,16 +26,26 @@ export type CsvParseResult = {
   errors: string[]
 }
 
+export type CameraOption = {
+  id: string
+  label: string
+}
+
+export type ScannerOptions = {
+  deviceId?: string
+}
+
 export type BarcodeScanner = {
   start: (
     videoElement: HTMLVideoElement,
     onDetected: (barcode: string) => void,
     onStatusChange: (message: string | null) => void,
   ) => Promise<void>
+  focus: () => Promise<boolean>
   stop: () => void
 }
 
-export type CreateBarcodeScanner = () => BarcodeScanner
+export type CreateBarcodeScanner = (options?: ScannerOptions) => BarcodeScanner
 
 export type TagDraft = {
   tags: string[]

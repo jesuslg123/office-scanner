@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import { mergeScannedItems, sortScannedItems } from './lib/items'
@@ -69,6 +69,9 @@ function createMockScanner() {
       detectedHandler = onDetected
       statusHandler = onStatusChange
       onStatusChange('Point the barcode inside the square frame.')
+    },
+    async focus() {
+      return true
     },
     stop() {
       detectedHandler = null
@@ -156,6 +159,63 @@ describe('App', () => {
       expect(
         screen.queryByRole('dialog', { name: 'Assign tags' }),
       ).not.toBeInTheDocument()
+    })
+  })
+
+  it('lets you switch between specific camera inputs in scan mode', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+    const scanner: BarcodeScanner = {
+      async start(_videoElement, _onDetected, onStatusChange) {
+        onStatusChange(null)
+      },
+      async focus() {
+        return true
+      },
+      stop() {},
+    }
+    const createScanner = vi.fn<CreateBarcodeScanner>().mockReturnValue(scanner)
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([
+          {
+            deviceId: 'wide-camera',
+            groupId: 'rear',
+            kind: 'videoinput',
+            label: 'Back Camera Wide',
+            toJSON() {
+              return this
+            },
+          },
+          {
+            deviceId: 'tele-camera',
+            groupId: 'rear',
+            kind: 'videoinput',
+            label: 'Back Camera Telephoto',
+            toJSON() {
+              return this
+            },
+          },
+        ]),
+      },
+    })
+
+    render(<App createScanner={createScanner} repository={repository} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open scanner' }))
+
+    const cameraSelector = await screen.findByLabelText('Camera')
+    expect(screen.getByRole('option', { name: 'Back Camera Wide' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'Back Camera Telephoto' }),
+    ).toBeInTheDocument()
+
+    await user.selectOptions(cameraSelector, 'tele-camera')
+
+    await waitFor(() => {
+      expect(createScanner).toHaveBeenLastCalledWith({ deviceId: 'tele-camera' })
     })
   })
 

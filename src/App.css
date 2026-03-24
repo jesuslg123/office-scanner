@@ -497,6 +497,18 @@ button {
   margin-top: 18px;
 }
 
+.scanner-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.camera-field {
+  margin-top: 0;
+}
+
 .field-label {
   font-size: 0.86rem;
   color: var(--muted);
@@ -509,6 +521,7 @@ button {
 }
 
 .text-input,
+.select-input,
 .text-area {
   width: 100%;
   border-radius: 16px;
@@ -520,9 +533,15 @@ button {
 }
 
 .text-input:focus,
+.select-input:focus,
 .text-area:focus {
   outline: 2px solid rgba(31, 122, 91, 0.22);
   outline-offset: 1px;
+}
+
+.select-input {
+  appearance: none;
+  cursor: pointer;
 }
 
 .text-area {
@@ -534,6 +553,10 @@ button {
   flex: 0 0 auto;
   min-width: 68px;
   padding: 10px 12px;
+}
+
+.scanner-action {
+  white-space: nowrap;
 }
 
 .tag-grid {
@@ -554,8 +577,14 @@ button {
   }
 
   .dialog-actions button,
-  .settings-panel button {
+  .settings-panel button,
+  .scanner-action {
     flex: 1 1 180px;
+  }
+
+  .scanner-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .top-bar-layout {
