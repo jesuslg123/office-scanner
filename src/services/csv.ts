@@ -12,10 +12,13 @@ import type { CsvParseResult, CsvRow, ScannedItem } from '../types'
 const CSV_COLUMNS = [
   'barcode',
   'tags',
+  'comment',
   'firstScannedAt',
   'lastScannedAt',
   'scanCount',
 ] as const
+
+const REQUIRED_COLUMNS = CSV_COLUMNS.filter((column) => column !== 'comment')
 
 function parseDate(value: string): string | null {
   const parsed = new Date(value)
@@ -43,6 +46,7 @@ export function exportItemsToCsv(items: ScannedItem[]): string {
   const rows: CsvRow[] = sortScannedItems(items).map((item) => ({
     barcode: item.barcode,
     tags: item.tags.join('|'),
+    comment: item.comment,
     firstScannedAt: item.firstScannedAt,
     lastScannedAt: item.lastScannedAt,
     scanCount: item.scanCount,
@@ -61,7 +65,7 @@ export function parseItemsFromCsv(csvText: string): CsvParseResult {
   })
 
   const availableColumns = parsed.meta.fields ?? []
-  const missingColumns = CSV_COLUMNS.filter(
+  const missingColumns = REQUIRED_COLUMNS.filter(
     (column) => !availableColumns.includes(column),
   )
 
@@ -80,6 +84,7 @@ export function parseItemsFromCsv(csvText: string): CsvParseResult {
   parsed.data.forEach((row, index) => {
     const barcode = normalizeBarcode(row.barcode ?? '')
     const tags = normalizeTags((row.tags ?? '').split('|'))
+    const comment = row.comment ?? ''
     const firstScannedAt = parseDate(row.firstScannedAt ?? '')
     const lastScannedAt = parseDate(row.lastScannedAt ?? '')
     const scanCount = parseScanCount(row.scanCount ?? '')
@@ -108,6 +113,7 @@ export function parseItemsFromCsv(csvText: string): CsvParseResult {
     const nextItem = normalizeScannedItem({
       barcode,
       tags,
+      comment,
       firstScannedAt,
       lastScannedAt,
       scanCount,

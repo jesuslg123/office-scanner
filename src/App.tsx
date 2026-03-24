@@ -21,6 +21,8 @@ import type {
   CreateBarcodeScanner,
   ScannedItem,
   ScannerRepository,
+  TagDraft,
+  TagOption,
 } from './types'
 
 const defaultRepository = createScannerRepository()
@@ -96,6 +98,16 @@ export default function App({
   const existingTagSelection = taggingBarcode
     ? items.find((item) => item.barcode === taggingBarcode)?.tags ?? []
     : []
+  const existingComment = taggingBarcode
+    ? items.find((item) => item.barcode === taggingBarcode)?.comment ?? ''
+    : ''
+  const availableFilterTags: TagOption[] = [
+    ...new Map(
+      [...preloadedTags.map((tag) => tag.label), ...items.flatMap((item) => item.tags)]
+        .sort((left, right) => left.localeCompare(right))
+        .map((label) => [label, { id: label, label }]),
+    ).values(),
+  ]
 
   const handleToggleFilter = (tagId: string) => {
     setActiveFilters((current) =>
@@ -111,12 +123,12 @@ export default function App({
     setTaggingBarcode(barcode)
   }
 
-  const handleSaveTags = async (tags: string[]) => {
+  const handleSaveTags = async ({ tags, comment }: TagDraft) => {
     if (!taggingBarcode) {
       return
     }
 
-    await repository.upsertScan(taggingBarcode, tags)
+    await repository.upsertScan(taggingBarcode, tags, comment)
     await refreshItems()
     setNotice(`Saved ${taggingBarcode}.`)
     setTaggingBarcode(null)
@@ -261,15 +273,15 @@ export default function App({
                     ) : null}
                   </div>
                   <div className="tag-row">
-                    {preloadedTags.map((tag) => {
-                      const isActive = activeFilters.includes(tag.id)
+                    {availableFilterTags.map((tag) => {
+                      const isActive = activeFilters.includes(tag.label)
 
                       return (
                         <button
                           aria-pressed={isActive}
                           className={`tag-chip ${isActive ? 'active' : ''}`}
                           key={tag.id}
-                          onClick={() => handleToggleFilter(tag.id)}
+                          onClick={() => handleToggleFilter(tag.label)}
                           type="button"
                         >
                           {tag.label}
@@ -359,19 +371,14 @@ export default function App({
                     {item.tags.length === 0 ? (
                       <span className="empty-tag">No tags</span>
                     ) : (
-                      item.tags.map((tagId) => {
-                        const tagLabel =
-                          preloadedTags.find((tag) => tag.id === tagId)?.label ??
-                          tagId
-
-                        return (
-                          <span className="item-tag" key={`${item.barcode}-${tagId}`}>
-                            {tagLabel}
-                          </span>
-                        )
-                      })
+                      item.tags.map((tag) => (
+                        <span className="item-tag" key={`${item.barcode}-${tag}`}>
+                          {tag}
+                        </span>
+                      ))
                     )}
                   </div>
+                  {item.comment ? <p className="item-comment">{item.comment}</p> : null}
                   <p className="item-meta">
                     First scanned {formatDateTime(item.firstScannedAt)}
                   </p>
@@ -410,6 +417,7 @@ export default function App({
       <TagDialog
         availableTags={preloadedTags}
         barcode={taggingBarcode}
+        initialComment={existingComment}
         initialSelectedTags={existingTagSelection}
         onCancel={handleCancelTagging}
         onSave={handleSaveTags}

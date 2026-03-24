@@ -18,10 +18,16 @@ class MemoryRepository implements ScannerRepository {
     return this.items
   }
 
-  async upsertScan(barcode: string, tags: string[], scannedAt = '2026-03-24T10:00:00.000Z') {
+  async upsertScan(
+    barcode: string,
+    tags: string[],
+    comment = '',
+    scannedAt = '2026-03-24T10:00:00.000Z',
+  ) {
     const incoming: ScannedItem = {
       barcode,
       tags: [...new Set(tags)],
+      comment,
       firstScannedAt: scannedAt,
       lastScannedAt: scannedAt,
       scanCount: 1,
@@ -149,12 +155,17 @@ describe('App', () => {
     scanner.emit('ABC-001')
 
     await user.click(await screen.findByRole('button', { name: 'Laptop' }))
+    await user.type(screen.getByPlaceholderText('Add tags separated by commas'), 'urgent')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByPlaceholderText('Add a note for this barcode'), 'Assigned to reception.')
     await user.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => {
       expect(screen.getByText('ABC-001')).toBeInTheDocument()
     })
     expect(screen.getByText('Laptop')).toBeInTheDocument()
+    expect(screen.getByText('urgent')).toBeInTheDocument()
+    expect(screen.getByText('Assigned to reception.')).toBeInTheDocument()
   })
 
   it('imports csv data and reflects merged results', async () => {
@@ -166,8 +177,8 @@ describe('App', () => {
     const input = document.querySelector('input[type="file"]')
     const file = new File(
       [
-        'barcode,tags,firstScannedAt,lastScannedAt,scanCount\n' +
-          'XYZ-123,desk|monitor,2026-03-20T10:00:00.000Z,2026-03-24T10:00:00.000Z,2',
+        'barcode,tags,comment,firstScannedAt,lastScannedAt,scanCount\n' +
+          'XYZ-123,Desk|Monitor,Front office,2026-03-20T10:00:00.000Z,2026-03-24T10:00:00.000Z,2',
       ],
       'import.csv',
       { type: 'text/csv' },
@@ -185,6 +196,7 @@ describe('App', () => {
     expect(savedItem).not.toBeNull()
     expect(within(savedItem as HTMLLIElement).getByText('Desk')).toBeInTheDocument()
     expect(within(savedItem as HTMLLIElement).getByText('Monitor')).toBeInTheDocument()
+    expect(within(savedItem as HTMLLIElement).getByText('Front office')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Toggle filters' }))
     await user.click(screen.getByRole('button', { name: 'Desk' }))

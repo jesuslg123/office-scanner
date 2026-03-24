@@ -10,14 +10,20 @@ export function normalizeTags(tags: string[]): string[] {
   )
 }
 
+export function normalizeComment(value?: string | null): string {
+  return value?.trim() ?? ''
+}
+
 export function createScannedItem(
   barcode: string,
   tags: string[],
+  comment: string,
   scannedAt: string,
 ): ScannedItem {
   return {
     barcode: normalizeBarcode(barcode),
     tags: normalizeTags(tags),
+    comment: normalizeComment(comment),
     firstScannedAt: scannedAt,
     lastScannedAt: scannedAt,
     scanCount: 1,
@@ -29,6 +35,7 @@ export function normalizeScannedItem(item: ScannedItem): ScannedItem {
     ...item,
     barcode: normalizeBarcode(item.barcode),
     tags: normalizeTags(item.tags),
+    comment: normalizeComment(item.comment),
   }
 }
 
@@ -39,6 +46,7 @@ export function mergeScannedItems(
   return {
     barcode: existing.barcode,
     tags: normalizeTags([...existing.tags, ...incoming.tags]),
+    comment: normalizeComment(incoming.comment) || existing.comment,
     firstScannedAt:
       new Date(existing.firstScannedAt).getTime() <=
       new Date(incoming.firstScannedAt).getTime()

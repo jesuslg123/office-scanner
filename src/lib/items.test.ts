@@ -12,6 +12,7 @@ describe('items helpers', () => {
       {
         barcode: '12345',
         tags: ['desk'],
+        comment: '',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-20T10:00:00.000Z',
         scanCount: 1,
@@ -19,6 +20,7 @@ describe('items helpers', () => {
       {
         barcode: '12345',
         tags: ['monitor', 'desk'],
+        comment: 'Corner office',
         firstScannedAt: '2026-03-24T10:00:00.000Z',
         lastScannedAt: '2026-03-24T10:00:00.000Z',
         scanCount: 1,
@@ -26,6 +28,7 @@ describe('items helpers', () => {
     )
 
     expect(merged.tags).toEqual(['desk', 'monitor'])
+    expect(merged.comment).toBe('Corner office')
     expect(merged.firstScannedAt).toBe('2026-03-20T10:00:00.000Z')
     expect(merged.lastScannedAt).toBe('2026-03-24T10:00:00.000Z')
     expect(merged.scanCount).toBe(2)
@@ -36,6 +39,7 @@ describe('items helpers', () => {
       {
         barcode: 'AAA',
         tags: ['desk'],
+        comment: '',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-20T10:00:00.000Z',
         scanCount: 1,
@@ -43,6 +47,7 @@ describe('items helpers', () => {
       {
         barcode: 'BBB',
         tags: ['monitor'],
+        comment: '',
         firstScannedAt: '2026-03-21T10:00:00.000Z',
         lastScannedAt: '2026-03-21T10:00:00.000Z',
         scanCount: 1,
@@ -57,6 +62,7 @@ describe('items helpers', () => {
       {
         barcode: 'AAA',
         tags: [],
+        comment: '',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-20T10:00:00.000Z',
         scanCount: 1,
@@ -64,6 +70,7 @@ describe('items helpers', () => {
       {
         barcode: 'BBB',
         tags: [],
+        comment: '',
         firstScannedAt: '2026-03-24T10:00:00.000Z',
         lastScannedAt: '2026-03-24T10:00:00.000Z',
         scanCount: 1,

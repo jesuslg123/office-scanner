@@ -7,7 +7,8 @@ describe('csv service', () => {
     const csv = exportItemsToCsv([
       {
         barcode: '12345',
-        tags: ['desk', 'monitor'],
+        tags: ['Desk', 'Monitor'],
+        comment: 'North wing desk',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-24T10:00:00.000Z',
         scanCount: 3,
@@ -19,7 +20,8 @@ describe('csv service', () => {
     expect(parsed.items).toEqual([
       {
         barcode: '12345',
-        tags: ['desk', 'monitor'],
+        tags: ['Desk', 'Monitor'],
+        comment: 'North wing desk',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-24T10:00:00.000Z',
         scanCount: 3,
@@ -28,14 +30,15 @@ describe('csv service', () => {
   })
 
   it('skips invalid rows and keeps valid ones', () => {
-    const parsed = parseItemsFromCsv(`barcode,tags,firstScannedAt,lastScannedAt,scanCount
-111,desk,2026-03-20T10:00:00.000Z,2026-03-24T10:00:00.000Z,2
-222,monitor,bad-date,2026-03-24T10:00:00.000Z,1`)
+    const parsed = parseItemsFromCsv(`barcode,tags,comment,firstScannedAt,lastScannedAt,scanCount
+111,Desk,Printer room,2026-03-20T10:00:00.000Z,2026-03-24T10:00:00.000Z,2
+222,Monitor,,bad-date,2026-03-24T10:00:00.000Z,1`)
 
     expect(parsed.items).toEqual([
       {
         barcode: '111',
-        tags: ['desk'],
+        tags: ['Desk'],
+        comment: 'Printer room',
         firstScannedAt: '2026-03-20T10:00:00.000Z',
         lastScannedAt: '2026-03-24T10:00:00.000Z',
         scanCount: 2,

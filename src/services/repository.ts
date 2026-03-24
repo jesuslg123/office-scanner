@@ -38,12 +38,14 @@ class IndexedDbScannerRepository implements ScannerRepository {
 
   async getAllItems(): Promise<ScannedItem[]> {
     const database = await this.dbPromise
-    return database.getAll(STORE_NAME)
+    const items = await database.getAll(STORE_NAME)
+    return items.map(normalizeScannedItem)
   }
 
   async upsertScan(
     barcode: string,
     tags: string[],
+    comment = '',
     scannedAt = new Date().toISOString(),
   ): Promise<ScannedItem> {
     const normalizedBarcode = normalizeBarcode(barcode)
@@ -54,7 +56,7 @@ class IndexedDbScannerRepository implements ScannerRepository {
 
     const database = await this.dbPromise
     const existing = await database.get(STORE_NAME, normalizedBarcode)
-    const incoming = createScannedItem(normalizedBarcode, tags, scannedAt)
+    const incoming = createScannedItem(normalizedBarcode, tags, comment, scannedAt)
     const nextItem = existing ? mergeScannedItems(existing, incoming) : incoming
 
     await database.put(STORE_NAME, nextItem)
