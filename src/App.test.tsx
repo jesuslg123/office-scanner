@@ -78,6 +78,44 @@ function createMockScanner() {
 }
 
 describe('App', () => {
+  it('hides import and export actions behind the settings button', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    render(<App repository={repository} />)
+
+    expect(
+      screen.queryByRole('button', { name: 'Import CSV' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Toggle settings' }))
+
+    expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeInTheDocument()
+  })
+
+  it('shows filters in a floating panel from the top bar', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    render(<App repository={repository} />)
+    const filterToggle = screen.getByRole('button', { name: 'Toggle filters' })
+
+    expect(
+      screen.queryByRole('button', { name: 'Desk' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(filterToggle)
+
+    expect(screen.getByRole('button', { name: 'Desk' })).toBeInTheDocument()
+    expect(screen.getByText('Workspace tags')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Desk' }))
+
+    expect(filterToggle).toHaveClass('active')
+    expect(within(filterToggle).getByText('1')).toBeInTheDocument()
+  })
+
   it('opens scan mode and shows the tag dialog after a scan', async () => {
     const repository = new MemoryRepository()
     const scanner = createMockScanner()
@@ -148,6 +186,7 @@ describe('App', () => {
     expect(within(savedItem as HTMLLIElement).getByText('Desk')).toBeInTheDocument()
     expect(within(savedItem as HTMLLIElement).getByText('Monitor')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'Toggle filters' }))
     await user.click(screen.getByRole('button', { name: 'Desk' }))
 
     expect(screen.getByText('XYZ-123')).toBeInTheDocument()

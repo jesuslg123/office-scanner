@@ -43,6 +43,8 @@ export default function App({
   const [taggingBarcode, setTaggingBarcode] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const deferredFilters = useDeferredValue(activeFilters)
@@ -215,71 +217,120 @@ export default function App({
   return (
     <div className="app-shell">
       <main className="app-frame">
-        <section className="hero-panel">
-          <p className="eyebrow">Office inventory scanner</p>
-          <div className="hero-row">
-            <div>
-              <h1>Scan and organize barcodes offline.</h1>
-              <p className="hero-copy">
-                Capture office equipment with the camera, tag each barcode, and
-                keep everything saved locally on the device.
-              </p>
-            </div>
-            <div className="toolbar">
+        <section className="top-bar">
+          <div className="top-bar-layout">
+            <div className="top-bar-filters">
               <button
-                className="secondary-button"
-                disabled={isImporting}
-                onClick={handleImportClick}
+                aria-expanded={filtersOpen}
+                aria-label="Toggle filters"
+                className={`icon-button settings-trigger filter-trigger ${
+                  activeFilters.length > 0 ? 'active' : ''
+                }`}
+                onClick={() => setFiltersOpen((current) => !current)}
                 type="button"
               >
-                {isImporting ? 'Importing...' : 'Import CSV'}
-              </button>
-              <button
-                className="primary-button"
-                disabled={isExporting || items.length === 0}
-                onClick={() => void handleExport()}
-                type="button"
-              >
-                {isExporting ? 'Exporting...' : 'Export CSV'}
-              </button>
-            </div>
-          </div>
-          <input
-            accept=".csv,text/csv"
-            className="hidden-input"
-            onChange={(event) => void handleImportFile(event)}
-            ref={fileInputRef}
-            type="file"
-          />
-          {notice ? <p className="notice-banner">{notice}</p> : null}
-        </section>
-
-        <section className="content-panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Filter by tag</p>
-              <h2>Workspace tags</h2>
-            </div>
-            <span className="count-pill">{filteredItems.length} items</span>
-          </div>
-          <div className="tag-row">
-            {preloadedTags.map((tag) => {
-              const isActive = activeFilters.includes(tag.id)
-
-              return (
-                <button
-                  aria-pressed={isActive}
-                  className={`tag-chip ${isActive ? 'active' : ''}`}
-                  key={tag.id}
-                  onClick={() => handleToggleFilter(tag.id)}
-                  type="button"
+                <svg
+                  aria-hidden="true"
+                  className="icon-svg"
+                  viewBox="0 0 24 24"
                 >
-                  {tag.label}
-                </button>
-              )
-            })}
+                  <path
+                    d="M3 5.5C3 4.67 3.67 4 4.5 4h15a1.5 1.5 0 0 1 1.14 2.48L15 13.17V18a1 1 0 0 1-.55.9l-4 2A1 1 0 0 1 9 20v-6.83L3.36 6.48A1.5 1.5 0 0 1 3 5.5Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                {activeFilters.length > 0 ? (
+                  <span className="filter-count-badge">{activeFilters.length}</span>
+                ) : null}
+              </button>
+              {filtersOpen ? (
+                <div className="floating-panel filter-panel">
+                  <div className="floating-panel-header">
+                    <div>
+                      <p className="eyebrow">Filter by tag</p>
+                      <h2>Workspace tags</h2>
+                    </div>
+                    {activeFilters.length > 0 ? (
+                      <button
+                        className="secondary-button clear-button"
+                        onClick={() => setActiveFilters([])}
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="tag-row">
+                    {preloadedTags.map((tag) => {
+                      const isActive = activeFilters.includes(tag.id)
+
+                      return (
+                        <button
+                          aria-pressed={isActive}
+                          className={`tag-chip ${isActive ? 'active' : ''}`}
+                          key={tag.id}
+                          onClick={() => handleToggleFilter(tag.id)}
+                          type="button"
+                        >
+                          {tag.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <h1 className="top-bar-title">Office Scanner</h1>
+            <div className="top-bar-settings">
+              <button
+                aria-expanded={settingsOpen}
+                aria-label="Toggle settings"
+                className="icon-button settings-trigger"
+                onClick={() => setSettingsOpen((current) => !current)}
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="icon-svg"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M19.14 12.94a7.96 7.96 0 0 0 .05-.94 7.96 7.96 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.28 7.28 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7.28 7.28 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.96 7.96 0 0 0-.05.94c0 .32.02.63.05.94L2.82 14.16a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54c.58-.24 1.13-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+              {settingsOpen ? (
+                <div className="toolbar floating-panel settings-panel">
+                  <button
+                    className="secondary-button"
+                    disabled={isImporting}
+                    onClick={handleImportClick}
+                    type="button"
+                  >
+                    {isImporting ? 'Importing...' : 'Import CSV'}
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={isExporting || items.length === 0}
+                    onClick={() => void handleExport()}
+                    type="button"
+                  >
+                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
+        <input
+          accept=".csv,text/csv"
+          className="hidden-input"
+          onChange={(event) => void handleImportFile(event)}
+          ref={fileInputRef}
+          type="file"
+        />
+        {notice ? <p className="notice-banner">{notice}</p> : null}
 
         <section className="content-panel list-panel">
           <div className="section-heading">
