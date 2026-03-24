@@ -1,0 +1,155 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it } from 'vitest'
+
+import App from './App'
+import { mergeScannedItems, sortScannedItems } from './lib/items'
+import type {
+  BarcodeScanner,
+  CreateBarcodeScanner,
+  ScannedItem,
+  ScannerRepository,
+} from './types'
+
+class MemoryRepository implements ScannerRepository {
+  private items: ScannedItem[] = []
+
+  async getAllItems() {
+    return this.items
+  }
+
+  async upsertScan(barcode: string, tags: string[], scannedAt = '2026-03-24T10:00:00.000Z') {
+    const incoming: ScannedItem = {
+      barcode,
+      tags: [...new Set(tags)],
+      firstScannedAt: scannedAt,
+      lastScannedAt: scannedAt,
+      scanCount: 1,
+    }
+    const existing = this.items.find((item) => item.barcode === barcode)
+    const nextItem = existing ? mergeScannedItems(existing, incoming) : incoming
+
+    this.items = sortScannedItems(
+      existing
+        ? this.items.map((item) => (item.barcode === barcode ? nextItem : item))
+        : [...this.items, nextItem],
+    )
+
+    return nextItem
+  }
+
+  async importItems(items: ScannedItem[]) {
+    for (const item of items) {
+      const existing = this.items.find((entry) => entry.barcode === item.barcode)
+      const nextItem = existing ? mergeScannedItems(existing, item) : item
+
+      this.items = sortScannedItems(
+        existing
+          ? this.items.map((entry) =>
+              entry.barcode === item.barcode ? nextItem : entry,
+            )
+          : [...this.items, nextItem],
+      )
+    }
+  }
+}
+
+function createMockScanner() {
+  let detectedHandler: ((barcode: string) => void) | null = null
+  let statusHandler: ((message: string | null) => void) | null = null
+
+  const scanner: BarcodeScanner & { emit: (barcode: string) => void } = {
+    async start(_videoElement, onDetected, onStatusChange) {
+      detectedHandler = onDetected
+      statusHandler = onStatusChange
+      onStatusChange('Point the barcode inside the square frame.')
+    },
+    stop() {
+      detectedHandler = null
+      statusHandler = null
+    },
+    emit(barcode: string) {
+      statusHandler?.(null)
+      detectedHandler?.(barcode)
+    },
+  }
+
+  return scanner
+}
+
+describe('App', () => {
+  it('opens scan mode and shows the tag dialog after a scan', async () => {
+    const repository = new MemoryRepository()
+    const scanner = createMockScanner()
+    const createScanner: CreateBarcodeScanner = () => scanner
+    const user = userEvent.setup()
+
+    render(<App createScanner={createScanner} repository={repository} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open scanner' }))
+    expect(
+      screen.getByRole('dialog', { name: 'Barcode scanner' }),
+    ).toBeInTheDocument()
+
+    scanner.emit('12345')
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Assign tags' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('12345')).toBeInTheDocument()
+  })
+
+  it('saves selected tags and updates the list', async () => {
+    const repository = new MemoryRepository()
+    const scanner = createMockScanner()
+    const createScanner: CreateBarcodeScanner = () => scanner
+    const user = userEvent.setup()
+
+    render(<App createScanner={createScanner} repository={repository} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open scanner' }))
+    scanner.emit('ABC-001')
+
+    await user.click(await screen.findByRole('button', { name: 'Laptop' }))
+    await user.click(screen.getByRole('button', { name: 'Save item' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('ABC-001')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Laptop')).toBeInTheDocument()
+  })
+
+  it('imports csv data and reflects merged results', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    render(<App repository={repository} />)
+
+    const input = document.querySelector('input[type="file"]')
+    const file = new File(
+      [
+        'barcode,tags,firstScannedAt,lastScannedAt,scanCount\n' +
+          'XYZ-123,desk|monitor,2026-03-20T10:00:00.000Z,2026-03-24T10:00:00.000Z,2',
+      ],
+      'import.csv',
+      { type: 'text/csv' },
+    )
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [file] },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('XYZ-123')).toBeInTheDocument()
+    })
+    const savedItem = screen.getByText('XYZ-123').closest('li')
+
+    expect(savedItem).not.toBeNull()
+    expect(within(savedItem as HTMLLIElement).getByText('Desk')).toBeInTheDocument()
+    expect(within(savedItem as HTMLLIElement).getByText('Monitor')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Desk' }))
+
+    expect(screen.getByText('XYZ-123')).toBeInTheDocument()
+  })
+})
