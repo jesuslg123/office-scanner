@@ -64,6 +64,17 @@ class IndexedDbScannerRepository implements ScannerRepository {
     return nextItem
   }
 
+  async deleteItem(barcode: string): Promise<void> {
+    const normalizedBarcode = normalizeBarcode(barcode)
+
+    if (!normalizedBarcode) {
+      throw new Error('Barcode value is required.')
+    }
+
+    const database = await this.dbPromise
+    await database.delete(STORE_NAME, normalizedBarcode)
+  }
+
   async importItems(items: ScannedItem[]): Promise<void> {
     const database = await this.dbPromise
     const transaction = database.transaction(STORE_NAME, 'readwrite')

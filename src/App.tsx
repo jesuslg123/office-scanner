@@ -45,6 +45,7 @@ export default function App({
   const [taggingBarcode, setTaggingBarcode] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [deletingBarcode, setDeletingBarcode] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -264,6 +265,29 @@ export default function App({
     }
   }
 
+  const handleDeleteItem = async (barcode: string) => {
+    if (
+      !window.confirm(`Delete saved scan ${barcode}? This cannot be undone.`)
+    ) {
+      return
+    }
+
+    setDeletingBarcode(barcode)
+    setNotice(null)
+
+    try {
+      await repository.deleteItem(barcode)
+      await refreshItems()
+      setNotice(`Deleted ${barcode}.`)
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : 'Unable to delete this item.',
+      )
+    } finally {
+      setDeletingBarcode(null)
+    }
+  }
+
   return (
     <div className="app-shell">
       <main className="app-frame">
@@ -403,7 +427,31 @@ export default function App({
                 <li className="item-card" key={item.barcode}>
                   <div className="item-topline">
                     <strong>{item.barcode}</strong>
-                    <span className="count-pill">{item.scanCount} scans</span>
+                    <div className="item-actions">
+                      <span className="count-pill">{item.scanCount} scans</span>
+                      <button
+                        aria-label={`Delete ${item.barcode}`}
+                        className="item-delete-button"
+                        disabled={deletingBarcode === item.barcode}
+                        onClick={() => void handleDeleteItem(item.barcode)}
+                        type="button"
+                      >
+                        {deletingBarcode === item.barcode ? (
+                          '...'
+                        ) : (
+                          <svg
+                            aria-hidden="true"
+                            className="icon-svg item-delete-icon"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M9 3.75A1.75 1.75 0 0 0 7.25 5.5V6H5.5a.75.75 0 0 0 0 1.5h.82l.78 10.14A2.5 2.5 0 0 0 9.59 20h4.82a2.5 2.5 0 0 0 2.49-2.36l.78-10.14h.82a.75.75 0 0 0 0-1.5h-1.75v-.5A1.75 1.75 0 0 0 15 3.75H9Zm6.25 2.25H8.75v-.5A.25.25 0 0 1 9 5.25h6a.25.25 0 0 1 .25.25V6Zm-5 3.25a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Zm4.5 0a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="tag-row compact">
                     {item.tags.length === 0 ? (

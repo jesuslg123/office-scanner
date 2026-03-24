@@ -60,5 +60,6 @@ export type ScannerRepository = {
     comment?: string,
     scannedAt?: string,
   ) => Promise<ScannedItem>
+  deleteItem: (barcode: string) => Promise<void>
   importItems: (items: ScannedItem[]) => Promise<void>
 }

@@ -44,6 +44,10 @@ class MemoryRepository implements ScannerRepository {
     return nextItem
   }
 
+  async deleteItem(barcode: string) {
+    this.items = this.items.filter((item) => item.barcode !== barcode)
+  }
+
   async importItems(items: ScannedItem[]) {
     for (const item of items) {
       const existing = this.items.find((entry) => entry.barcode === item.barcode)
@@ -278,5 +282,32 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Desk' }))
 
     expect(screen.getByText('XYZ-123')).toBeInTheDocument()
+  })
+
+  it('deletes a saved barcode from the list', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    await repository.upsertScan(
+      'ABC-001',
+      ['Laptop'],
+      'Assigned to reception.',
+      '2026-03-24T10:00:00.000Z',
+    )
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<App repository={repository} />)
+
+    expect(await screen.findByText('ABC-001')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete ABC-001' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('ABC-001')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Deleted ABC-001.')).toBeInTheDocument()
+
+    confirmSpy.mockRestore()
   })
 })
