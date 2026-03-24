@@ -1,6 +1,75 @@
 import { normalizeBarcode } from '../lib/items'
 import type { BarcodeScanner } from '../types'
 
+type TrackCapabilitiesWithFocus = MediaTrackCapabilities & {
+  focusMode?: string[]
+}
+
+type FocusConstraintSet = MediaTrackConstraintSet & {
+  focusMode?: string
+}
+
+const BACK_CAMERA_LABELS = /(back|rear|environment|world|wide|ultra|tele|camera 0)/i
+const FRONT_CAMERA_LABELS = /(front|user|facetime|selfie)/i
+
+async function getPreferredRearCameraId(): Promise<string | undefined> {
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  const videoInputs = devices.filter((device) => device.kind === 'videoinput')
+
+  const preferredRearCamera = videoInputs.find((device) =>
+    BACK_CAMERA_LABELS.test(device.label),
+  )
+
+  if (preferredRearCamera) {
+    return preferredRearCamera.deviceId
+  }
+
+  const nonFrontCamera = videoInputs.find(
+    (device) => !FRONT_CAMERA_LABELS.test(device.label),
+  )
+
+  return nonFrontCamera?.deviceId
+}
+
+function getActiveVideoTrack(videoElement: HTMLVideoElement): MediaStreamTrack | null {
+  const stream = videoElement.srcObject
+
+  if (!(stream instanceof MediaStream)) {
+    return null
+  }
+
+  return stream.getVideoTracks()[0] ?? null
+}
+
+async function applyPreferredFocus(videoElement: HTMLVideoElement): Promise<void> {
+  const track = getActiveVideoTrack(videoElement)
+
+  if (!track || typeof track.getCapabilities !== 'function') {
+    return
+  }
+
+  const capabilities = track.getCapabilities() as TrackCapabilitiesWithFocus
+  const advanced: FocusConstraintSet[] = []
+
+  if (capabilities.focusMode?.includes('continuous')) {
+    advanced.push({ focusMode: 'continuous' })
+  } else if (capabilities.focusMode?.includes('single-shot')) {
+    advanced.push({ focusMode: 'single-shot' })
+  }
+
+  if (advanced.length === 0) {
+    return
+  }
+
+  try {
+    await track.applyConstraints({
+      advanced: advanced as MediaTrackConstraintSet[],
+    })
+  } catch {
+    // Focus-related constraints are uneven across devices, so ignore failures.
+  }
+}
+
 export function createBarcodeScanner(): BarcodeScanner {
   let controls: { stop: () => void } | null = null
   let activeVideo: HTMLVideoElement | null = null
@@ -59,11 +128,15 @@ export function createBarcodeScanner(): BarcodeScanner {
       })
 
       try {
+        const preferredRearCameraId = await getPreferredRearCameraId()
+
         controls = await reader.decodeFromConstraints(
           {
             audio: false,
             video: {
-              facingMode: { ideal: 'environment' },
+              ...(preferredRearCameraId
+                ? { deviceId: { exact: preferredRearCameraId } }
+                : { facingMode: { ideal: 'environment' } }),
               width: { ideal: 1280 },
               height: { ideal: 1280 },
             },
@@ -96,6 +169,8 @@ export function createBarcodeScanner(): BarcodeScanner {
             onStatusChange(null)
           },
         )
+
+        await applyPreferredFocus(videoElement)
       } catch (error) {
         stop()
         onStatusChange(
