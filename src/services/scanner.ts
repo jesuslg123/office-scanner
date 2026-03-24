@@ -11,6 +11,25 @@ type FocusConstraintSet = MediaTrackConstraintSet & {
 
 const BACK_CAMERA_LABELS = /(back|rear|environment|world|wide|ultra|tele|camera 0)/i
 const FRONT_CAMERA_LABELS = /(front|user|facetime|selfie)/i
+const TRANSIENT_DECODE_ERROR_NAMES = new Set([
+  'ChecksumException',
+  'FormatException',
+  'NotFoundException',
+  'ReaderException',
+])
+
+function isTransientDecodeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return (
+    TRANSIENT_DECODE_ERROR_NAMES.has(error.name) ||
+    /no multiformat readers? w(?:ere|here) able to detect the code/i.test(
+      error.message,
+    )
+  )
+}
 
 async function getPreferredRearCameraId(): Promise<string | undefined> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -102,7 +121,10 @@ export function createBarcodeScanner(): BarcodeScanner {
       activeVideo.muted = true
       activeVideo.playsInline = true
 
-      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] =
+      const [
+        { BrowserMultiFormatReader },
+        { BarcodeFormat, DecodeHintType, ReaderException },
+      ] =
         await Promise.all([import('@zxing/browser'), import('@zxing/library')])
 
       cleanVideoSource = BrowserMultiFormatReader.cleanVideoSource
@@ -161,7 +183,11 @@ export function createBarcodeScanner(): BarcodeScanner {
               return
             }
 
-            if (error && error.name !== 'NotFoundException') {
+            if (
+              error &&
+              !(error instanceof ReaderException) &&
+              !isTransientDecodeError(error)
+            ) {
               onStatusChange(error.message || 'Unable to scan this barcode.')
               return
             }
