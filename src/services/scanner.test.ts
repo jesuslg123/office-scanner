@@ -158,6 +158,15 @@ describe('createBarcodeScanner', () => {
         },
       },
       {
+        deviceId: 'rear-camera-0',
+        groupId: 'rear',
+        kind: 'videoinput',
+        label: 'Camera 0, facing back',
+        toJSON() {
+          return this
+        },
+      },
+      {
         deviceId: 'tele-camera',
         groupId: 'rear',
         kind: 'videoinput',
@@ -181,10 +190,11 @@ describe('createBarcodeScanner', () => {
 
     expect(result.cameras).toEqual([
       { id: 'front-camera', label: 'Front Camera' },
+      { id: 'rear-camera-0', label: 'Camera 0, facing back' },
       { id: 'tele-camera', label: 'Back Camera Telephoto' },
       { id: 'wide-camera', label: 'Back Camera Wide' },
     ])
-    expect(result.preferredCameraId).toBe('tele-camera')
+    expect(result.preferredCameraId).toBe('rear-camera-0')
   })
 
   it('uses the selected camera id when starting the scanner', async () => {

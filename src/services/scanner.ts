@@ -10,6 +10,8 @@ type FocusConstraintSet = MediaTrackConstraintSet & {
 }
 
 const BACK_CAMERA_LABELS = /(back|rear|environment|world|wide|ultra|tele|camera 0)/i
+const BACK_CAMERA_ZERO_LABELS =
+  /((back|rear|environment).*(camera\s*0|0\b))|((camera\s*0|0\b).*(back|rear|environment))/i
 const FRONT_CAMERA_LABELS = /(front|user|facetime|selfie)/i
 const TRANSIENT_DECODE_ERROR_NAMES = new Set([
   'ChecksumException',
@@ -50,6 +52,14 @@ async function getAvailableVideoInputs(): Promise<MediaDeviceInfo[]> {
 function getPreferredRearCameraId(
   videoInputs: MediaDeviceInfo[],
 ): string | undefined {
+  const cameraZeroFacingBack = videoInputs.find((device) =>
+    BACK_CAMERA_ZERO_LABELS.test(device.label),
+  )
+
+  if (cameraZeroFacingBack) {
+    return cameraZeroFacingBack.deviceId
+  }
+
   const preferredRearCamera = videoInputs.find((device) =>
     BACK_CAMERA_LABELS.test(device.label),
   )

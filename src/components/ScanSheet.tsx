@@ -25,7 +25,6 @@ export function ScanSheet({
   const [availableCameras, setAvailableCameras] = useState<CameraOption[]>([])
   const [preferredCameraId, setPreferredCameraId] = useState<string | null>(null)
   const [selectedCameraId, setSelectedCameraId] = useState<string | 'auto'>('auto')
-  const [isRefocusing, setIsRefocusing] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   const handleDetected = useEffectEvent(onDetected)
@@ -53,7 +52,6 @@ export function ScanSheet({
       return
     }
 
-    setIsRefocusing(true)
     setStatusMessage(null)
 
     try {
@@ -62,8 +60,8 @@ export function ScanSheet({
       if (!focused) {
         setStatusMessage('Refocus is not supported on this camera.')
       }
-    } finally {
-      setIsRefocusing(false)
+    } catch {
+      setStatusMessage('Unable to refocus this camera.')
     }
   })
 
@@ -170,13 +168,12 @@ export function ScanSheet({
           </div>
         ) : (
           <>
-            <div className="scanner-toolbar">
-              {availableCameras.length > 1 ? (
-                <label className="field-group camera-field" htmlFor="scanner-camera">
-                  <span className="field-label">Camera</span>
+            <div className="scanner-stage">
+              <div className="scanner-frame">
+                {availableCameras.length > 1 ? (
                   <select
-                    className="select-input"
-                    id="scanner-camera"
+                    aria-label="Camera"
+                    className="scanner-camera-select"
                     onChange={(event) => setSelectedCameraId(event.target.value)}
                     value={activeCameraId}
                   >
@@ -186,19 +183,7 @@ export function ScanSheet({
                       </option>
                     ))}
                   </select>
-                </label>
-              ) : null}
-              <button
-                className="secondary-button scanner-action"
-                disabled={isRefocusing}
-                onClick={() => void handleRefocus()}
-                type="button"
-              >
-                {isRefocusing ? 'Refocusing...' : 'Refocus'}
-              </button>
-            </div>
-            <div className="scanner-stage">
-              <div className="scanner-frame">
+                ) : null}
                 <video
                   aria-label="Barcode scanner camera preview"
                   autoPlay
@@ -206,6 +191,12 @@ export function ScanSheet({
                   muted
                   playsInline
                   ref={videoRef}
+                />
+                <button
+                  aria-label="Refocus camera"
+                  className="scanner-focus-hitarea"
+                  onClick={() => void handleRefocus()}
+                  type="button"
                 />
               </div>
             </div>
