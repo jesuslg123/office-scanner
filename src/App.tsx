@@ -80,6 +80,9 @@ export default function App({
   const [notice, setNotice] = useState<string | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [pausedBarcode, setPausedBarcode] = useState<string | null>(null)
+  const [duplicateScanBarcode, setDuplicateScanBarcode] = useState<string | null>(
+    null,
+  )
   const [taggingBarcode, setTaggingBarcode] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -196,6 +199,9 @@ export default function App({
   const pendingDeleteItem = pendingDeleteBarcode
     ? items.find((item) => item.barcode === pendingDeleteBarcode) ?? null
     : null
+  const duplicateScanItem = duplicateScanBarcode
+    ? items.find((item) => item.barcode === duplicateScanBarcode) ?? null
+    : null
   const existingTagSelection = taggingBarcode
     ? items.find((item) => item.barcode === taggingBarcode)?.tags ?? []
     : []
@@ -228,6 +234,14 @@ export default function App({
   const handleDetected = (barcode: string) => {
     setNotice(null)
     setPausedBarcode(barcode)
+
+    if (items.some((item) => item.barcode === barcode)) {
+      setDuplicateScanBarcode(barcode)
+      setTaggingBarcode(null)
+      return
+    }
+
+    setDuplicateScanBarcode(null)
     setTaggingBarcode(barcode)
   }
 
@@ -239,23 +253,42 @@ export default function App({
     await repository.upsertScan(taggingBarcode, tags, comment)
     await refreshItems()
     setNotice(`Saved ${taggingBarcode}.`)
+    setDuplicateScanBarcode(null)
     setTaggingBarcode(null)
   }
 
   const handleCancelTagging = () => {
+    setDuplicateScanBarcode(null)
     setTaggingBarcode(null)
     setPausedBarcode(null)
   }
 
   const handleCloseScanner = () => {
+    setDuplicateScanBarcode(null)
     setPausedBarcode(null)
     setTaggingBarcode(null)
     setScanOpen(false)
   }
 
   const handleScanAnother = () => {
+    setDuplicateScanBarcode(null)
     setPausedBarcode(null)
     setTaggingBarcode(null)
+  }
+
+  const handleContinueDuplicateScan = () => {
+    if (!duplicateScanBarcode) {
+      return
+    }
+
+    setTaggingBarcode(duplicateScanBarcode)
+    setDuplicateScanBarcode(null)
+  }
+
+  const handleIgnoreDuplicateScan = () => {
+    setDuplicateScanBarcode(null)
+    setTaggingBarcode(null)
+    setPausedBarcode(null)
   }
 
   const handleImportClick = () => {
@@ -667,8 +700,8 @@ export default function App({
         onClose={handleCloseScanner}
         onDetected={handleDetected}
         onScanAnother={handleScanAnother}
-        open={scanOpen}
-        pausedBarcode={pausedBarcode && !taggingBarcode ? pausedBarcode : null}
+        open={scanOpen && !taggingBarcode && !duplicateScanBarcode}
+        pausedBarcode={pausedBarcode}
       />
 
       <TagDialog
@@ -680,6 +713,54 @@ export default function App({
         onSave={handleSaveTags}
         open={Boolean(taggingBarcode)}
       />
+
+      {duplicateScanBarcode && duplicateScanItem ? (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleIgnoreDuplicateScan()
+            }
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="duplicate-dialog-title"
+            aria-modal="true"
+            className="dialog confirm-dialog"
+            role="dialog"
+          >
+            <p className="eyebrow">Duplicate barcode detected</p>
+            <h2 id="duplicate-dialog-title">Already scanned</h2>
+            <p className="dialog-barcode">{duplicateScanBarcode}</p>
+            <p className="dialog-copy">
+              This item has already been scanned {duplicateScanItem.scanCount}{' '}
+              {duplicateScanItem.scanCount === 1 ? 'time' : 'times'}. Continue
+              to update its tags and count another scan, or ignore it and keep
+              scanning.
+            </p>
+            <p className="dialog-note">
+              Last scanned {formatDateTime(duplicateScanItem.lastScannedAt)}
+            </p>
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                onClick={handleIgnoreDuplicateScan}
+                type="button"
+              >
+                Ignore
+              </button>
+              <button
+                className="primary-button"
+                onClick={handleContinueDuplicateScan}
+                type="button"
+              >
+                Continue
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {pendingDeleteBarcode ? (
         <div

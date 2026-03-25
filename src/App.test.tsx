@@ -247,10 +247,9 @@ describe('App', () => {
 
     scanner.emit('12345')
 
-    expect(
-      await screen.findByRole('dialog', { name: 'Assign tags' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('12345')).toBeInTheDocument()
+    const tagDialog = await screen.findByRole('dialog', { name: 'Assign tags' })
+    expect(tagDialog).toBeInTheDocument()
+    expect(within(tagDialog).getByText('12345')).toBeInTheDocument()
 
     fireEvent.mouseDown(document.querySelector('.dialog-backdrop') as Element)
 
@@ -343,6 +342,92 @@ describe('App', () => {
     expect(screen.getByText('Laptop')).toBeInTheDocument()
     expect(screen.getByText('urgent')).toBeInTheDocument()
     expect(screen.getByText('Assigned to reception.')).toBeInTheDocument()
+  })
+
+  it('warns before continuing a duplicate scan', async () => {
+    const repository = new MemoryRepository()
+    const scanner = createMockScanner()
+    const createScanner: CreateBarcodeScanner = () => scanner
+    const user = userEvent.setup()
+
+    await repository.upsertScan(
+      'ABC-001',
+      ['Laptop'],
+      'Assigned to reception.',
+      '2026-03-24T10:00:00.000Z',
+    )
+
+    render(<App createScanner={createScanner} repository={repository} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open scanner' }))
+    scanner.emit('ABC-001')
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Already scanned' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('dialog', { name: 'Assign tags' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Assign tags' }),
+    ).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Assigned to reception.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save item' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Scans 2')).toBeInTheDocument()
+    })
+  })
+
+  it('ignores a duplicate scan and resumes scanning', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+    const scanners: ReturnType<typeof createMockScanner>[] = []
+    const createScanner = vi.fn<CreateBarcodeScanner>().mockImplementation(() => {
+      const scanner = createMockScanner()
+      scanners.push(scanner)
+      return scanner
+    })
+
+    await repository.upsertScan(
+      'ABC-001',
+      ['Laptop'],
+      'Assigned to reception.',
+      '2026-03-24T10:00:00.000Z',
+    )
+
+    render(<App createScanner={createScanner} repository={repository} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open scanner' }))
+    expect(createScanner).toHaveBeenCalledTimes(1)
+
+    scanners[0]?.emit('ABC-001')
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Already scanned' }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Ignore' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Already scanned' }),
+      ).not.toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(createScanner).toHaveBeenCalledTimes(2)
+    })
+
+    scanners[1]?.emit('NEW-002')
+
+    const tagDialog = await screen.findByRole('dialog', { name: 'Assign tags' })
+    expect(tagDialog).toBeInTheDocument()
+    expect(within(tagDialog).getByText('NEW-002')).toBeInTheDocument()
   })
 
   it('imports csv data and reflects merged results', async () => {
