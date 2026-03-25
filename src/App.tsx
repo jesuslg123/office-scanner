@@ -428,7 +428,6 @@ export default function App({
                   <div className="item-topline">
                     <strong>{item.barcode}</strong>
                     <div className="item-actions">
-                      <span className="count-pill">{item.scanCount} scans</span>
                       <button
                         aria-label={`Delete ${item.barcode}`}
                         className="item-delete-button"
@@ -470,12 +469,17 @@ export default function App({
                       {item.comment}
                     </p>
                   ) : null}
-                  <p className="item-meta">
-                    First scanned {formatDateTime(item.firstScannedAt)}
-                  </p>
-                  <p className="item-meta">
-                    Last scanned {formatDateTime(item.lastScannedAt)}
-                  </p>
+                  <div className="item-meta-row">
+                    <p className="item-meta">
+                      First scanned {formatDateTime(item.firstScannedAt)}
+                    </p>
+                    <p className="item-meta">
+                      Last scanned {formatDateTime(item.lastScannedAt)}
+                    </p>
+                    <p className="item-meta item-meta-count">
+                      Scans {item.scanCount}
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>

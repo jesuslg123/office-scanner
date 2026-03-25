@@ -295,7 +295,6 @@ button {
   border: 1px solid var(--line);
 }
 
-.count-pill,
 .item-tag,
 .empty-tag {
   display: inline-flex;
@@ -303,11 +302,6 @@ button {
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 0.86rem;
-}
-
-.count-pill {
-  color: var(--accent-strong);
-  background: var(--accent-soft);
 }
 
 .item-delete-button {
@@ -389,13 +383,19 @@ button {
   opacity: 0.82;
 }
 
-.item-card .tag-row + .item-meta,
-.item-card .item-comment + .item-meta {
-  margin-top: 10px;
+.item-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
 }
 
-.item-card .item-meta + .item-meta {
-  margin-top: 2px;
+.item-meta-count {
+  opacity: 0.6;
+}
+
+.item-card .tag-row + .item-meta-row,
+.item-card .item-comment + .item-meta-row {
+  margin-top: 10px;
 }
 
 .item-comment {
