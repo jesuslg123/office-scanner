@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  filterItems,
   filterItemsByTags,
   mergeScannedItems,
   sortScannedItems,
+  toDateInputValue,
 } from './items'
 
 describe('items helpers', () => {
@@ -55,6 +57,79 @@ describe('items helpers', () => {
     ]
 
     expect(filterItemsByTags(items, ['desk', 'chair'])).toEqual([items[0]])
+  })
+
+  it('filters using the last scan date as the DATE reference', () => {
+    const items = [
+      {
+        barcode: 'AAA',
+        tags: ['desk'],
+        comment: '',
+        firstScannedAt: '2026-03-20T10:00:00.000Z',
+        lastScannedAt: '2026-03-20T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'BBB',
+        tags: ['monitor'],
+        comment: '',
+        firstScannedAt: '2026-03-21T10:00:00.000Z',
+        lastScannedAt: '2026-03-24T10:00:00.000Z',
+        scanCount: 1,
+      },
+    ]
+
+    expect(
+      filterItems(items, [
+        {
+          type: 'DATE',
+          reference: 'lastScannedAt',
+          mode: 'date',
+          value: toDateInputValue(items[1].lastScannedAt),
+        },
+      ]),
+    ).toEqual([items[1]])
+  })
+
+  it('filters using an inclusive last scan date range', () => {
+    const items = [
+      {
+        barcode: 'AAA',
+        tags: ['desk'],
+        comment: '',
+        firstScannedAt: '2026-03-20T10:00:00.000Z',
+        lastScannedAt: '2026-03-20T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'BBB',
+        tags: ['monitor'],
+        comment: '',
+        firstScannedAt: '2026-03-21T10:00:00.000Z',
+        lastScannedAt: '2026-03-22T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'CCC',
+        tags: ['chair'],
+        comment: '',
+        firstScannedAt: '2026-03-23T10:00:00.000Z',
+        lastScannedAt: '2026-03-24T10:00:00.000Z',
+        scanCount: 1,
+      },
+    ]
+
+    expect(
+      filterItems(items, [
+        {
+          type: 'DATE',
+          reference: 'lastScannedAt',
+          mode: 'range',
+          start: toDateInputValue(items[1].lastScannedAt),
+          end: toDateInputValue(items[2].lastScannedAt),
+        },
+      ]),
+    ).toEqual([items[1], items[2]])
   })
 
   it('sorts most recent scans first', () => {

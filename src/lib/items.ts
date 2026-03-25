@@ -1,4 +1,4 @@
-import type { ScannedItem } from '../types'
+import type { DateFilter, ItemFilter, ScannedItem } from '../types'
 
 export function normalizeBarcode(value: string): string {
   return value.trim()
@@ -65,12 +65,47 @@ export function filterItemsByTags(
   items: ScannedItem[],
   activeTags: string[],
 ): ScannedItem[] {
-  if (activeTags.length === 0) {
+  return filterItems(
+    items,
+    activeTags.length === 0 ? [] : [{ type: 'TAG', values: activeTags }],
+  )
+}
+
+export function toDateInputValue(value: string): string {
+  const date = new Date(value)
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function matchesDateFilter(item: ScannedItem, filter: DateFilter): boolean {
+  const lastScannedDate = toDateInputValue(item.lastScannedAt)
+
+  if (filter.mode === 'date') {
+    return lastScannedDate === filter.value
+  }
+
+  return lastScannedDate >= filter.start && lastScannedDate <= filter.end
+}
+
+export function filterItems(
+  items: ScannedItem[],
+  filters: ItemFilter[],
+): ScannedItem[] {
+  if (filters.length === 0) {
     return items
   }
 
   return items.filter((item) =>
-    item.tags.some((tag) => activeTags.includes(tag)),
+    filters.every((filter) => {
+      if (filter.type === 'TAG') {
+        return filter.values.some((tag) => item.tags.includes(tag))
+      }
+
+      return matchesDateFilter(item, filter)
+    }),
   )
 }
 

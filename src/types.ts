@@ -3,6 +3,28 @@ export type TagOption = {
   label: string
 }
 
+export type DateFilter =
+  | {
+      type: 'DATE'
+      reference: 'lastScannedAt'
+      mode: 'date'
+      value: string
+    }
+  | {
+      type: 'DATE'
+      reference: 'lastScannedAt'
+      mode: 'range'
+      start: string
+      end: string
+    }
+
+export type ItemFilter =
+  | {
+      type: 'TAG'
+      values: string[]
+    }
+  | DateFilter
+
 export type ScannedItem = {
   barcode: string
   tags: string[]

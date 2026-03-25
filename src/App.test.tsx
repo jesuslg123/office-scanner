@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import App from './App'
-import { mergeScannedItems, sortScannedItems } from './lib/items'
+import { mergeScannedItems, sortScannedItems, toDateInputValue } from './lib/items'
 import type {
   BarcodeScanner,
   CreateBarcodeScanner,
@@ -129,12 +129,107 @@ describe('App', () => {
     await user.click(filterToggle)
 
     expect(screen.getByRole('button', { name: 'Desk' })).toBeInTheDocument()
-    expect(screen.getByText('Workspace tags')).toBeInTheDocument()
+    expect(screen.getByText('Tags and dates')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Desk' }))
 
     expect(filterToggle).toHaveClass('active')
     expect(within(filterToggle).getByText('1')).toBeInTheDocument()
+  })
+
+  it('filters items by the last scanned DATE value', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    await repository.importItems([
+      {
+        barcode: 'AAA',
+        tags: ['Desk'],
+        comment: '',
+        firstScannedAt: '2026-03-20T10:00:00.000Z',
+        lastScannedAt: '2026-03-20T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'BBB',
+        tags: ['Monitor'],
+        comment: '',
+        firstScannedAt: '2026-03-24T10:00:00.000Z',
+        lastScannedAt: '2026-03-24T10:00:00.000Z',
+        scanCount: 1,
+      },
+    ])
+
+    render(<App repository={repository} />)
+
+    expect(await screen.findByText('AAA')).toBeInTheDocument()
+    expect(screen.getByText('BBB')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Toggle filters' }))
+    await user.type(
+      screen.getByLabelText('Last scanned on'),
+      toDateInputValue('2026-03-24T10:00:00.000Z'),
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText('AAA')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('BBB')).toBeInTheDocument()
+  })
+
+  it('filters items by an inclusive last scanned date range', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    await repository.importItems([
+      {
+        barcode: 'AAA',
+        tags: ['Desk'],
+        comment: '',
+        firstScannedAt: '2026-03-20T10:00:00.000Z',
+        lastScannedAt: '2026-03-20T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'BBB',
+        tags: ['Monitor'],
+        comment: '',
+        firstScannedAt: '2026-03-22T10:00:00.000Z',
+        lastScannedAt: '2026-03-22T10:00:00.000Z',
+        scanCount: 1,
+      },
+      {
+        barcode: 'CCC',
+        tags: ['Chair'],
+        comment: '',
+        firstScannedAt: '2026-03-24T10:00:00.000Z',
+        lastScannedAt: '2026-03-24T10:00:00.000Z',
+        scanCount: 1,
+      },
+    ])
+
+    render(<App repository={repository} />)
+
+    expect(await screen.findByText('AAA')).toBeInTheDocument()
+    expect(screen.getByText('BBB')).toBeInTheDocument()
+    expect(screen.getByText('CCC')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Toggle filters' }))
+    await user.click(screen.getByRole('button', { name: 'Range' }))
+    await user.type(
+      screen.getByLabelText('Last scanned from'),
+      toDateInputValue('2026-03-22T10:00:00.000Z'),
+    )
+    await user.type(
+      screen.getByLabelText('Last scanned to'),
+      toDateInputValue('2026-03-24T10:00:00.000Z'),
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText('AAA')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('BBB')).toBeInTheDocument()
+    expect(screen.getByText('CCC')).toBeInTheDocument()
   })
 
   it('opens scan mode and shows the tag dialog after a scan', async () => {
@@ -241,7 +336,9 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => {
-      expect(screen.getByText('ABC-001')).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Delete ABC-001' }),
+      ).toBeInTheDocument()
     })
     expect(screen.getByText('Laptop')).toBeInTheDocument()
     expect(screen.getByText('urgent')).toBeInTheDocument()

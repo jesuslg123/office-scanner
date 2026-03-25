@@ -12,13 +12,15 @@ import { ScanSheet } from './components/ScanSheet'
 import { TagDialog } from './components/TagDialog'
 import { preloadedTags } from './data/preloadedTags'
 import { formatDateTime } from './lib/format'
-import { filterItemsByTags, sortScannedItems } from './lib/items'
+import { filterItems, sortScannedItems } from './lib/items'
 import { exportItemsToCsv, parseItemsFromCsv } from './services/csv'
 import { exportCsvFile } from './services/fileTransfer'
 import { createScannerRepository } from './services/repository'
 import { createBarcodeScanner } from './services/scanner'
 import type {
   CreateBarcodeScanner,
+  DateFilter,
+  ItemFilter,
   ScannedItem,
   ScannerRepository,
   TagDraft,
@@ -32,13 +34,49 @@ type AppProps = {
   createScanner?: CreateBarcodeScanner
 }
 
+function buildDateFilter(
+  mode: DateFilter['mode'],
+  dateValue: string,
+  rangeStart: string,
+  rangeEnd: string,
+): DateFilter | null {
+  if (mode === 'date') {
+    if (!dateValue) {
+      return null
+    }
+
+    return {
+      type: 'DATE',
+      reference: 'lastScannedAt',
+      mode: 'date',
+      value: dateValue,
+    }
+  }
+
+  if (!rangeStart || !rangeEnd) {
+    return null
+  }
+
+  return {
+    type: 'DATE',
+    reference: 'lastScannedAt',
+    mode: 'range',
+    start: rangeStart <= rangeEnd ? rangeStart : rangeEnd,
+    end: rangeStart <= rangeEnd ? rangeEnd : rangeStart,
+  }
+}
+
 export default function App({
   repository = defaultRepository,
   createScanner = createBarcodeScanner,
 }: AppProps) {
   const [items, setItems] = useState<ScannedItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([])
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilter['mode']>('date')
+  const [selectedDate, setSelectedDate] = useState('')
+  const [rangeStartDate, setRangeStartDate] = useState('')
+  const [rangeEndDate, setRangeEndDate] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [pausedBarcode, setPausedBarcode] = useState<string | null>(null)
@@ -55,7 +93,14 @@ export default function App({
   const filtersContainerRef = useRef<HTMLDivElement | null>(null)
   const settingsContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const deferredFilters = useDeferredValue(activeFilters)
+  const deferredTagFilters = useDeferredValue(activeTagFilters)
+  const activeDateFilter = buildDateFilter(
+    dateFilterMode,
+    selectedDate,
+    rangeStartDate,
+    rangeEndDate,
+  )
+  const deferredDateFilter = useDeferredValue(activeDateFilter)
 
   useEffect(() => {
     let isMounted = true
@@ -136,7 +181,18 @@ export default function App({
     })
   }
 
-  const filteredItems = filterItemsByTags(items, deferredFilters)
+  const activeItemFilters: ItemFilter[] = [
+    ...(deferredTagFilters.length > 0
+      ? [{ type: 'TAG', values: deferredTagFilters } satisfies ItemFilter]
+      : []),
+    ...(deferredDateFilter ? [deferredDateFilter] : []),
+  ]
+  const filteredItems = filterItems(items, activeItemFilters)
+  const activeFilterCount =
+    activeTagFilters.length + (activeDateFilter ? 1 : 0)
+  const isRangePending =
+    dateFilterMode === 'range' &&
+    ((rangeStartDate && !rangeEndDate) || (!rangeStartDate && rangeEndDate))
   const pendingDeleteItem = pendingDeleteBarcode
     ? items.find((item) => item.barcode === pendingDeleteBarcode) ?? null
     : null
@@ -155,11 +211,18 @@ export default function App({
   ]
 
   const handleToggleFilter = (tagId: string) => {
-    setActiveFilters((current) =>
+    setActiveTagFilters((current) =>
       current.includes(tagId)
         ? current.filter((value) => value !== tagId)
         : [...current, tagId],
     )
+  }
+
+  const handleClearFilters = () => {
+    setActiveTagFilters([])
+    setSelectedDate('')
+    setRangeStartDate('')
+    setRangeEndDate('')
   }
 
   const handleDetected = (barcode: string) => {
@@ -317,7 +380,7 @@ export default function App({
                 aria-expanded={filtersOpen}
                 aria-label="Toggle filters"
                 className={`icon-button settings-trigger filter-trigger ${
-                  activeFilters.length > 0 ? 'active' : ''
+                  activeFilterCount > 0 ? 'active' : ''
                 }`}
                 onClick={() => setFiltersOpen((current) => !current)}
                 type="button"
@@ -332,30 +395,104 @@ export default function App({
                     fill="currentColor"
                   />
                 </svg>
-                {activeFilters.length > 0 ? (
-                  <span className="filter-count-badge">{activeFilters.length}</span>
+                {activeFilterCount > 0 ? (
+                  <span className="filter-count-badge">{activeFilterCount}</span>
                 ) : null}
               </button>
               {filtersOpen ? (
                 <div className="floating-panel filter-panel">
                   <div className="floating-panel-header">
                     <div>
-                      <p className="eyebrow">Filter by tag</p>
-                      <h2>Workspace tags</h2>
+                      <p className="eyebrow">Filter saved items</p>
+                      <h2>Tags and dates</h2>
                     </div>
-                    {activeFilters.length > 0 ? (
+                    {activeFilterCount > 0 ? (
                       <button
                         className="secondary-button clear-button"
-                        onClick={() => setActiveFilters([])}
+                        onClick={handleClearFilters}
                         type="button"
                       >
                         Clear
                       </button>
                     ) : null}
                   </div>
+                  <div className="filter-section">
+                    <div className="filter-section-header">
+                      <p className="eyebrow">Filter type</p>
+                      <h3>DATE</h3>
+                    </div>
+                    <p className="filter-helper-text">
+                      Uses each item&apos;s last scanned date as the reference.
+                    </p>
+                    <div className="filter-mode-row">
+                      <button
+                        aria-pressed={dateFilterMode === 'date'}
+                        className={`tag-chip ${dateFilterMode === 'date' ? 'active' : ''}`}
+                        onClick={() => setDateFilterMode('date')}
+                        type="button"
+                      >
+                        Date
+                      </button>
+                      <button
+                        aria-pressed={dateFilterMode === 'range'}
+                        className={`tag-chip ${dateFilterMode === 'range' ? 'active' : ''}`}
+                        onClick={() => setDateFilterMode('range')}
+                        type="button"
+                      >
+                        Range
+                      </button>
+                    </div>
+                    {dateFilterMode === 'date' ? (
+                      <label className="filter-field">
+                        <span>Last scanned on</span>
+                        <input
+                          aria-label="Last scanned on"
+                          className="filter-date-input"
+                          onChange={(event) => setSelectedDate(event.target.value)}
+                          type="date"
+                          value={selectedDate}
+                        />
+                      </label>
+                    ) : (
+                      <div className="filter-date-grid">
+                        <label className="filter-field">
+                          <span>From</span>
+                          <input
+                            aria-label="Last scanned from"
+                            className="filter-date-input"
+                            max={rangeEndDate || undefined}
+                            onChange={(event) => setRangeStartDate(event.target.value)}
+                            type="date"
+                            value={rangeStartDate}
+                          />
+                        </label>
+                        <label className="filter-field">
+                          <span>To</span>
+                          <input
+                            aria-label="Last scanned to"
+                            className="filter-date-input"
+                            min={rangeStartDate || undefined}
+                            onChange={(event) => setRangeEndDate(event.target.value)}
+                            type="date"
+                            value={rangeEndDate}
+                          />
+                        </label>
+                      </div>
+                    )}
+                    {isRangePending ? (
+                      <p className="filter-helper-text">
+                        Pick both dates to apply the range.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="filter-section">
+                    <div className="filter-section-header">
+                      <p className="eyebrow">Filter type</p>
+                      <h3>Tags</h3>
+                    </div>
                   <div className="tag-row">
                     {availableFilterTags.map((tag) => {
-                      const isActive = activeFilters.includes(tag.label)
+                      const isActive = activeTagFilters.includes(tag.label)
 
                       return (
                         <button
@@ -369,6 +506,7 @@ export default function App({
                         </button>
                       )
                     })}
+                  </div>
                   </div>
                 </div>
               ) : null}
@@ -435,10 +573,15 @@ export default function App({
 
           {loading ? (
             <p className="empty-state">Loading saved barcodes...</p>
-          ) : filteredItems.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="empty-state">
               <strong>No scanned items yet.</strong>
               <p>Use the scan button to capture a barcode and assign tags.</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="empty-state">
+              <strong>No items match the current filters.</strong>
+              <p>Adjust the selected tags or last scan date to widen the results.</p>
             </div>
           ) : (
             <ul className="item-list">
