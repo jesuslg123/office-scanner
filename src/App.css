@@ -113,12 +113,17 @@ h2 {
   gap: 12px;
 }
 
+.dialog-actions {
+  margin-top: 20px;
+}
+
 button {
   font: inherit;
 }
 
 .primary-button,
 .secondary-button,
+.danger-button,
 .icon-button,
 .scan-fab,
 .tag-chip {
@@ -132,13 +137,15 @@ button {
 
 .primary-button,
 .secondary-button,
+.danger-button,
 .icon-button,
 .scan-fab {
   cursor: pointer;
 }
 
 .primary-button:disabled,
-.secondary-button:disabled {
+.secondary-button:disabled,
+.danger-button:disabled {
   cursor: wait;
   opacity: 0.7;
 }
@@ -150,11 +157,21 @@ button {
 }
 
 .secondary-button,
+.danger-button,
 .icon-button {
   padding: 12px 18px;
+}
+
+.secondary-button,
+.icon-button {
   color: var(--text);
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid var(--line);
+}
+
+.danger-button {
+  color: white;
+  background: linear-gradient(135deg, #a64530 0%, #7a2418 100%);
 }
 
 .icon-button {
@@ -282,6 +299,7 @@ button {
 .tag-chip:hover,
 .primary-button:hover,
 .secondary-button:hover,
+.danger-button:hover,
 .icon-button:hover,
 .scan-fab:hover {
   transform: translateY(-1px);
@@ -472,6 +490,10 @@ button {
   overscroll-behavior: contain;
 }
 
+.confirm-dialog {
+  width: min(440px, 100%);
+}
+
 .scanner-stage {
   display: flex;
   justify-content: center;
@@ -567,6 +589,20 @@ button {
 
 .dialog-barcode {
   margin: 0 0 18px;
+}
+
+.dialog-copy {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dialog-note {
+  margin: 0 0 18px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(32, 22, 12, 0.12);
+  line-height: 1.45;
+  color: var(--muted);
 }
 
 .field-group {

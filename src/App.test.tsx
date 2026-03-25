@@ -295,19 +295,50 @@ describe('App', () => {
       '2026-03-24T10:00:00.000Z',
     )
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<App repository={repository} />)
+
+    expect(await screen.findByText('ABC-001')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete ABC-001' }))
+    expect(
+      screen.getByRole('dialog', { name: 'Delete this barcode?' }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete item' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('ABC-001')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Deleted ABC-001.')).toBeInTheDocument()
+  })
+
+  it('keeps a saved barcode when deletion is cancelled', async () => {
+    const repository = new MemoryRepository()
+    const user = userEvent.setup()
+
+    await repository.upsertScan(
+      'ABC-001',
+      ['Laptop'],
+      '',
+      '2026-03-24T10:00:00.000Z',
+    )
 
     render(<App repository={repository} />)
 
     expect(await screen.findByText('ABC-001')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Delete ABC-001' }))
+    expect(
+      screen.getByRole('dialog', { name: 'Delete this barcode?' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Assigned to reception.')).not.toBeInTheDocument()
 
-    await waitFor(() => {
-      expect(screen.queryByText('ABC-001')).not.toBeInTheDocument()
-    })
-    expect(screen.getByText('Deleted ABC-001.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep item' }))
 
-    confirmSpy.mockRestore()
+    expect(screen.getByText('ABC-001')).toBeInTheDocument()
+    expect(screen.queryByText('Deleted ABC-001.')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('dialog', { name: 'Delete this barcode?' }),
+    ).not.toBeInTheDocument()
   })
 })

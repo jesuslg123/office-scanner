@@ -46,6 +46,9 @@ export default function App({
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [deletingBarcode, setDeletingBarcode] = useState<string | null>(null)
+  const [pendingDeleteBarcode, setPendingDeleteBarcode] = useState<string | null>(
+    null,
+  )
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -134,6 +137,9 @@ export default function App({
   }
 
   const filteredItems = filterItemsByTags(items, deferredFilters)
+  const pendingDeleteItem = pendingDeleteBarcode
+    ? items.find((item) => item.barcode === pendingDeleteBarcode) ?? null
+    : null
   const existingTagSelection = taggingBarcode
     ? items.find((item) => item.barcode === taggingBarcode)?.tags ?? []
     : []
@@ -265,12 +271,24 @@ export default function App({
     }
   }
 
-  const handleDeleteItem = async (barcode: string) => {
-    if (
-      !window.confirm(`Delete saved scan ${barcode}? This cannot be undone.`)
-    ) {
+  const handleRequestDelete = (barcode: string) => {
+    setPendingDeleteBarcode(barcode)
+  }
+
+  const handleCancelDelete = () => {
+    if (deletingBarcode) {
       return
     }
+
+    setPendingDeleteBarcode(null)
+  }
+
+  const handleDeleteItem = async () => {
+    if (!pendingDeleteBarcode) {
+      return
+    }
+
+    const barcode = pendingDeleteBarcode
 
     setDeletingBarcode(barcode)
     setNotice(null)
@@ -279,6 +297,7 @@ export default function App({
       await repository.deleteItem(barcode)
       await refreshItems()
       setNotice(`Deleted ${barcode}.`)
+      setPendingDeleteBarcode(null)
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : 'Unable to delete this item.',
@@ -432,7 +451,7 @@ export default function App({
                         aria-label={`Delete ${item.barcode}`}
                         className="item-delete-button"
                         disabled={deletingBarcode === item.barcode}
-                        onClick={() => void handleDeleteItem(item.barcode)}
+                        onClick={() => handleRequestDelete(item.barcode)}
                         type="button"
                       >
                         {deletingBarcode === item.barcode ? (
@@ -518,6 +537,58 @@ export default function App({
         onSave={handleSaveTags}
         open={Boolean(taggingBarcode)}
       />
+
+      {pendingDeleteBarcode ? (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCancelDelete()
+            }
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="delete-dialog-title"
+            aria-modal="true"
+            className="dialog confirm-dialog"
+            role="dialog"
+          >
+            <p className="eyebrow">Delete saved item</p>
+            <h2 id="delete-dialog-title">Delete this barcode?</h2>
+            {pendingDeleteItem?.barcode ? (
+              <p className="dialog-barcode">{pendingDeleteItem.barcode}</p>
+            ) : null}
+            {pendingDeleteItem?.comment ? (
+              <p className="dialog-note">{pendingDeleteItem.comment}</p>
+            ) : null}
+            <p className="dialog-copy">
+              This will remove the item, tags, note, and scan history from your
+              saved list.
+            </p>
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                disabled={deletingBarcode === pendingDeleteBarcode}
+                onClick={handleCancelDelete}
+                type="button"
+              >
+                Keep item
+              </button>
+              <button
+                className="danger-button"
+                disabled={deletingBarcode === pendingDeleteBarcode}
+                onClick={() => void handleDeleteItem()}
+                type="button"
+              >
+                {deletingBarcode === pendingDeleteBarcode
+                  ? 'Deleting...'
+                  : 'Delete item'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
